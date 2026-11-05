@@ -54,8 +54,12 @@ class HourlyRateLimiter:
 
 
 def temporal_ui_url(settings: TemporalSettings, workflow_id: str) -> str:
-    namespace = quote(settings.namespace, safe="")
+    # The demo platform injects the UI base and namespace: Temporal Cloud's, or a
+    # crashable workspace's dev server UI and namespace.
+    namespace = quote(os.environ.get("TEMPORAL_UI_NAMESPACE") or settings.namespace, safe="")
     workflow = quote(workflow_id, safe="")
+    if base := os.environ.get("TEMPORAL_UI_URL", "").rstrip("/"):
+        return f"{base}/namespaces/{namespace}/workflows/{workflow}"
     if "localhost" in settings.address or "127.0.0.1" in settings.address:
         return f"http://localhost:8233/namespaces/{namespace}/workflows/{workflow}"
     return f"https://cloud.temporal.io/namespaces/{namespace}/workflows/{workflow}"

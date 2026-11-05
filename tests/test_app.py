@@ -5,7 +5,7 @@ import pytest
 from aiohttp.test_utils import TestClient, TestServer
 from temporalio.client import WorkflowExecutionStatus
 
-from app import create_web_app
+from app import create_web_app, temporal_ui_url
 from config import TemporalSettings
 
 
@@ -143,3 +143,31 @@ async def test_invalid_research_query_is_rejected():
         temporal.start_workflow.assert_not_awaited()
     finally:
         await client.close()
+
+
+@pytest.mark.parametrize(
+    ("env", "address", "namespace", "expected"),
+    [
+        (
+            {"TEMPORAL_UI_URL": "https://cloud.temporal.io", "TEMPORAL_UI_NAMESPACE": "demo.acct"},
+            "demo.acct.tmprl.cloud:7233",
+            "demo.acct",
+            "https://cloud.temporal.io/namespaces/demo.acct/workflows/wf%2F1",
+        ),
+        (
+            {"TEMPORAL_UI_URL": "https://ws.example/_temporal/", "TEMPORAL_UI_NAMESPACE": "demo"},
+            "temporal-dev-server.ws.svc.cluster.local:7233",
+            "demo",
+            "https://ws.example/_temporal/namespaces/demo/workflows/wf%2F1",
+        ),
+        ({}, "localhost:7233", "default", "http://localhost:8233/namespaces/default/workflows/wf%2F1"),
+        ({}, "demo.acct.tmprl.cloud:7233", "demo.acct", "https://cloud.temporal.io/namespaces/demo.acct/workflows/wf%2F1"),
+    ],
+)
+def test_temporal_ui_url(monkeypatch, env, address, namespace, expected):
+    monkeypatch.delenv("TEMPORAL_UI_URL", raising=False)
+    monkeypatch.delenv("TEMPORAL_UI_NAMESPACE", raising=False)
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+    settings = SimpleNamespace(address=address, namespace=namespace)
+    assert temporal_ui_url(settings, "wf/1") == expected
